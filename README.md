@@ -206,6 +206,3 @@ This project is licensed under the **Apache 2.0 License** — free for use, modi
 - Deployed on **Google Cloud Run**  
 - Submission for **Google Cloud Run Hackathon 2025 (AI Studio Category)**
 """
-
-Path("/mnt/data/README.md").write_text(readme_text)
-"/mnt/data/README.md"
