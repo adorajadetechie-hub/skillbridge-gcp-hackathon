@@ -9,11 +9,12 @@ RUN npm ci || npm install
 # Copy the rest
 COPY . .
 
-# Accept the Gemini API key as a build-arg (do NOT hardcode)
-ARG GEMINI_API_KEY
-ENV GEMINI_API_KEY=${GEMINI_API_KEY}
+# Accept the Gemini API key as a build-arg for Vite (DO NOT hardcode)
+ARG VITE_GEMINI_API_KEY
+ENV VITE_GEMINI_API_KEY=${VITE_GEMINI_API_KEY}
 
 # Build the static site (Vite)
+ENV NODE_ENV=production
 RUN npm run build
 
 # --- Runtime stage ---

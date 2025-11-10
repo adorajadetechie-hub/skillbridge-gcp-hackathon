@@ -1,7 +1,8 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { AnalysisResult } from '../types';
 
-const API_KEY = process.env.API_KEY;
+// Read from Vite-injected env at build time
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 
 // NOTE: process.env.API_KEY is assumed to be pre-configured and accessible.
 // No UI for API key input is provided as per instructions.

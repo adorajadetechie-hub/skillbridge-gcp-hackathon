@@ -3,9 +3,9 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/containers/skillbridge-ui:v1'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/containers/skillbridge-ui:v7'
       - '--build-arg'
-      - 'GEMINI_API_KEY=$_GEMINI_API_KEY'
+      - 'VITE_GEMINI_API_KEY=$_VITE_GEMINI_API_KEY'
       - '.'
 images:
-  - 'us-central1-docker.pkg.dev/$PROJECT_ID/containers/skillbridge-ui:v1'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/containers/skillbridge-ui:v7'

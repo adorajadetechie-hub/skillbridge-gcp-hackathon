@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { analyzeResume } from './services/geminiService';
 import { AnalysisResult } from './types';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -14,17 +14,19 @@ const allowedMimeTypes = [
 ];
 
 const getAcceptedExtensionsString = () => {
-  return allowedMimeTypes.map(type => {
-    if (type === 'application/pdf') return '.pdf';
-    if (type === 'application/msword') return '.doc';
-    if (type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return '.docx';
-    if (type === 'text/plain') return '.txt';
-    return ''; // Should not happen with defined types
-  }).filter(ext => ext !== '').join(', ');
+  return allowedMimeTypes
+    .map(type => {
+      if (type === 'application/pdf') return '.pdf';
+      if (type === 'application/msword') return '.doc';
+      if (type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return '.docx';
+      if (type === 'text/plain') return '.txt';
+      return '';
+    })
+    .filter(ext => ext !== '')
+    .join(', ');
 };
 
 const acceptedExtensionsDisplay = getAcceptedExtensionsString();
-
 
 const App: React.FC = () => {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
@@ -32,6 +34,43 @@ const App: React.FC = () => {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Compose a clean plain-text export for copy/download
+  const analysisText = useMemo(() => {
+    if (!analysisResult) return '';
+    const lines: string[] = [];
+    lines.push('=== SkillBridge — Analysis Results ===');
+    lines.push('');
+    lines.push(`Target Role: ${targetRole || '-'}`);
+    if (resumeFile?.name) lines.push(`Resume File: ${resumeFile.name}`);
+    lines.push('');
+    lines.push('Career Gap Summary:');
+    lines.push(analysisResult.gap_summary || '-');
+    lines.push('');
+    lines.push('Missing Skills:');
+    if (analysisResult.missing_skills?.length) {
+      analysisResult.missing_skills.forEach((s) => lines.push(`- ${s}`));
+    } else {
+      lines.push('-');
+    }
+    lines.push('');
+    lines.push('Certifications:');
+    if (analysisResult.certifications?.length) {
+      analysisResult.certifications.forEach((c) => lines.push(`- ${c}`));
+    } else {
+      lines.push('-');
+    }
+    lines.push('');
+    lines.push('Learning Resources:');
+    if (analysisResult.learning_resources?.length) {
+      analysisResult.learning_resources.forEach((r) => lines.push(`- ${r}`));
+    } else {
+      lines.push('-');
+    }
+    lines.push('');
+    lines.push('======================================');
+    return lines.join('\n');
+  }, [analysisResult, targetRole, resumeFile]);
 
   const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -68,14 +107,14 @@ const App: React.FC = () => {
     } else if (!/^[a-zA-Z0-9\s.,\-/()&]*$/.test(trimmedValue)) {
       setError('Target role contains invalid characters. Only letters, numbers, spaces, and (., - / () &) are allowed.');
     } else {
-      setError(null); // Clear error if input is valid
+      setError(null);
     }
   }, []);
 
   const handleSubmit = useCallback(async (event: React.FormEvent) => {
     event.preventDefault();
 
-    // Re-validate all fields on submit, in case user bypassed `onChange` errors
+    // Re-validate all fields on submit
     if (!resumeFile) {
       setError('Please upload your resume.');
       return;
@@ -95,10 +134,7 @@ const App: React.FC = () => {
       return;
     }
 
-    // If there's an existing error from previous validation, don't proceed
-    if (error) {
-      return;
-    }
+    if (error) return;
 
     setIsLoading(true);
     setError(null);
@@ -108,13 +144,12 @@ const App: React.FC = () => {
     reader.onload = async (e) => {
       if (e.target && e.target.result) {
         try {
-          // Extract base64 part (data:mimeType;base64,BASE64_DATA)
-          const base64Content = (e.target.result as string).split(',')[1];
-          const result = await analyzeResume(base64Content, resumeFile.type, targetRole);
+          const base64Content = (e.target.result as string).split(',')[1]; // strip data:...;base64,
+          const result = await analyzeResume(base64Content, resumeFile.type, trimmedTargetRole);
           setAnalysisResult(result);
         } catch (err: any) {
-          console.error("Analysis failed:", err);
-          setError(err.message || 'An unexpected error occurred during analysis.');
+          console.error('Analysis failed:', err);
+          setError(err?.message || 'An unexpected error occurred during analysis.');
         } finally {
           setIsLoading(false);
         }
@@ -124,9 +159,54 @@ const App: React.FC = () => {
       setIsLoading(false);
       setError('Failed to read resume file.');
     };
-    // Read the file as a Data URL to get base64 encoded content
     reader.readAsDataURL(resumeFile);
-  }, [resumeFile, targetRole, error]); // Dependencies for useCallback
+  }, [resumeFile, targetRole, error]);
+
+  // Copy, Download, Reset actions
+  const copyToClipboard = useCallback(async () => {
+    if (!analysisText) return;
+    try {
+      await navigator.clipboard.writeText(analysisText);
+      alert('Analysis copied to clipboard.');
+    } catch {
+      // Fallback
+      const ta = document.createElement('textarea');
+      ta.value = analysisText;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        alert('Analysis copied to clipboard.');
+      } finally {
+        document.body.removeChild(ta);
+      }
+    }
+  }, [analysisText]);
+
+  const downloadTxt = useCallback(() => {
+    if (!analysisText) return;
+    const blob = new Blob([analysisText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeRole = (targetRole || 'role').replace(/\s+/g, '-').toLowerCase();
+    a.href = url;
+    a.download = `skillbridge-analysis-${safeRole}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [analysisText, targetRole]);
+
+  const resetAll = useCallback(() => {
+    setResumeFile(null);
+    setTargetRole('');
+    setAnalysisResult(null);
+    setError(null);
+    setIsLoading(false);
+    // Also clear the file input DOM value (best effort)
+    const input = document.getElementById('resume-upload') as HTMLInputElement | null;
+    if (input) input.value = '';
+  }, []);
 
   const currentYear = new Date().getFullYear();
 
@@ -143,7 +223,7 @@ const App: React.FC = () => {
 
       <main className="flex-grow container mx-auto p-4 md:p-8 flex flex-col items-center justify-center">
         <h1 className="text-4xl md:text-5xl font-extrabold text-stone-100 mb-8 text-center sr-only">
-          Skillbridge - Resume Gap Analyzer {/* Screen reader only title */}
+          Skillbridge - Resume Gap Analyzer
         </h1>
 
         <form onSubmit={handleSubmit} className="bg-stone-800 p-6 md:p-10 rounded-lg shadow-xl w-full max-w-2xl space-y-6">
@@ -183,10 +263,11 @@ const App: React.FC = () => {
               Accepted formats: {acceptedExtensionsDisplay}. Max size: {MAX_FILE_SIZE_MB}MB.
             </p>
             {resumeFile && (
-              <p className="mt-2 text-sm text-stone-400">Selected file: <span className="font-medium text-stone-200">{resumeFile.name}</span></p>
+              <p className="mt-2 text-sm text-stone-400">
+                Selected file: <span className="font-medium text-stone-200">{resumeFile.name}</span>
+              </p>
             )}
           </div>
-
 
           {error && (
             <p className="text-red-400 text-sm md:text-base text-center bg-red-900/40 p-3 rounded-md border border-red-600">
@@ -194,13 +275,25 @@ const App: React.FC = () => {
             </p>
           )}
 
-          <button
-            type="submit"
-            className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-md transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading || !resumeFile || !targetRole.trim() || error !== null}
-          >
-            {isLoading ? 'Analyzing...' : 'Start Analysis'}
-          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="submit"
+              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-md transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || !resumeFile || !targetRole.trim() || error !== null}
+              aria-live="polite"
+              aria-busy={isLoading}
+            >
+              {isLoading ? 'Analyzing...' : 'Start Analysis'}
+            </button>
+
+            <button
+              type="button"
+              onClick={resetAll}
+              className="w-full bg-transparent border border-stone-500 text-stone-100 hover:bg-stone-700 font-bold py-3 px-4 rounded-md transition duration-300"
+            >
+              Reset
+            </button>
+          </div>
         </form>
 
         {isLoading && <LoadingSpinner />}
@@ -228,7 +321,9 @@ const App: React.FC = () => {
                   ))}
                 </ul>
               ) : (
-                <p className="text-stone-400 italic bg-stone-700 p-4 rounded-md">No significant missing skills identified.</p>
+                <p className="text-stone-400 italic bg-stone-700 p-4 rounded-md">
+                  No significant missing skills identified.
+                </p>
               )}
             </div>
 
@@ -244,7 +339,9 @@ const App: React.FC = () => {
                   ))}
                 </ul>
               ) : (
-                <p className="text-stone-400 italic bg-stone-700 p-4 rounded-md">No specific certifications suggested at this time.</p>
+                <p className="text-stone-400 italic bg-stone-700 p-4 rounded-md">
+                  No specific certifications suggested at this time.
+                </p>
               )}
             </div>
 
@@ -256,7 +353,12 @@ const App: React.FC = () => {
                     <li key={index} className="flex items-start">
                       <span className="mr-2 text-amber-400">•</span>
                       {resource.startsWith('http://') || resource.startsWith('https://') ? (
-                        <a href={resource} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 underline break-all">
+                        <a
+                          href={resource}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-orange-400 hover:text-orange-300 underline break-all"
+                        >
                           {resource}
                         </a>
                       ) : (
@@ -266,8 +368,30 @@ const App: React.FC = () => {
                   ))}
                 </ul>
               ) : (
-                <p className="text-stone-400 italic bg-stone-700 p-4 rounded-md">No specific learning resources suggested.</p>
+                <p className="text-stone-400 italic bg-stone-700 p-4 rounded-md">
+                  No specific learning resources suggested.
+                </p>
               )}
+            </div>
+
+            {/* Actions: Copy & Download */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={copyToClipboard}
+                className="w-full bg-stone-700 hover:bg-stone-600 text-stone-100 font-bold py-3 px-4 rounded-md transition duration-300"
+                title="Copy analysis to clipboard"
+              >
+                Copy Result
+              </button>
+              <button
+                type="button"
+                onClick={downloadTxt}
+                className="w-full bg-stone-700 hover:bg-stone-600 text-stone-100 font-bold py-3 px-4 rounded-md transition duration-300"
+                title="Download analysis as .txt"
+              >
+                Download .txt
+              </button>
             </div>
           </div>
         )}
