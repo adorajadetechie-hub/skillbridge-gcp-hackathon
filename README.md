@@ -211,15 +211,18 @@ This project is licensed under the **Apache 2.0 License** — free for use, modi
 
 ```mermaid
 flowchart LR
-  U[End User\n(Browser)] -->|HTTPS| CR[Cloud Run Service:\nSkillBridge UI (React/Vite)]
-  CR -->|REST + API Key| GEM[Gemini API\n(Google AI Studio, gemini-2.5-pro)]
+  U[End User (Browser)] -->|HTTPS| CR[Cloud Run Service: SkillBridge UI (React/Vite)]
+  CR -->|REST + API Key| GEM[Gemini API (Google AI Studio, gemini-2.5-pro)]
+  
   subgraph CICD[CI/CD]
     CB[Cloud Build] --> AR[Artifact Registry]
     AR -->|Deploy| CR
   end
-  subgraph Ops[Ops]
-    SEC[Config / Secrets\n(GEMINI_API_KEY env var / Secret Manager)]
+  
+  subgraph OPS[Operations]
+    SEC[Config / Secrets (GEMINI_API_KEY env var / Secret Manager)]
     LOG[Cloud Logging & Monitoring]
   end
+  
   SEC --> CR
   CR --> LOG
