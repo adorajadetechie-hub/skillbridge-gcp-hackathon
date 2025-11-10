@@ -207,22 +207,3 @@ This project is licensed under the **Apache 2.0 License** — free for use, modi
 - Submission for **Google Cloud Run Hackathon 2025 (AI Studio Category)**
 
 
-## 🧭 Architecture Diagram
-
-```mermaid
-flowchart LR
-  U[End User (Browser)] --> CR[Cloud Run Service<br>SkillBridge UI (React/Vite)]
-  CR --> GEM[Gemini API<br>(Google AI Studio, gemini-2.5-pro)]
-
-  subgraph CICD[CI/CD Pipeline]
-    CB[Cloud Build] --> AR[Artifact Registry]
-    AR --> CR
-  end
-
-  subgraph OPS[Operations]
-    SEC[Config / Secrets<br>(GEMINI_API_KEY env var / Secret Manager)]
-    LOG[Cloud Logging & Monitoring]
-  end
-
-  SEC --> CR
-  CR --> LOG
