@@ -33,7 +33,6 @@ SkillBridge bridges this gap using **Google AI Studio (Gemini)**, transforming y
 | **AI Model** | Google Gemini 1.5 Pro (via AI Studio API) |
 | **Hosting** | Google Cloud Run (serverless) |
 | **Container Registry** | Artifact Registry |
-| **Auth & Secrets** | Google Cloud Secret Manager |
 
 ---
 
@@ -54,7 +53,7 @@ gcloud config set project skillbridge-<unique-id>
 ### 3️⃣ Get a Gemini API Key (AI Studio)
 1. Visit [Google AI Studio](https://aistudio.google.com/app/apikey)  
 2. Click **Create API Key** → select your Google Cloud Project  
-3. Copy the generated key (e.g., `AIzaSyC1234...`)  
+3. Copy the generated key
 4. Save it securely for environment configuration.
 
 ### 4️⃣ Install Google Cloud SDK
